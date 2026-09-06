@@ -31,12 +31,28 @@ def _lab_positive(person_id, samples):
 
 
 def _epi_linked(person_id, exposures, confirmed_ids):
+    """与确诊/可能病例共享「可疑食品」判定流行病学关联。
+
+    排除「人人皆吃」的通用食品（如主食米饭，全队列进食率≥90%）：其无判别力，
+    不能作为流行病学关联的依据，否则单餐次队列中人人共享主食而全部误判「可能」。
+    """
     if not confirmed_ids:
         return False
+    total, eaters = Counter(), Counter()
+    for e in exposures:
+        food = e.get("food_id")
+        if not food:
+            continue
+        total[food] += 1
+        if e.get("consumed"):
+            eaters[food] += 1
+    universal = {f for f, n in total.items() if n and eaters[f] / n >= 0.9}
     mine = {e.get("food_id") for e in exposures
-            if e.get("person_id") == person_id and e.get("consumed")}
+            if e.get("person_id") == person_id and e.get("consumed")
+            and e.get("food_id") not in universal}
     shared = {e.get("food_id") for e in exposures
-              if e.get("person_id") in confirmed_ids and e.get("consumed")}
+              if e.get("person_id") in confirmed_ids and e.get("consumed")
+              and e.get("food_id") not in universal}
     return bool(mine & shared)
 
 

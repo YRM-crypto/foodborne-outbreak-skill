@@ -1,6 +1,0 @@
-{% extends "base.html" %}{% block content %}
-<h1>报告草稿 — {{ event.title }}</h1>
-{% if issues %}<h2>质控问题</h2><ul>{% for i in issues %}<li>{{ i }}</li>{% endfor %}</ul>{% endif %}
-<h2>草稿</h2><pre>{{ md }}</pre>
-<a href="/investigations/{{ event.id }}">返回事件</a>
-{% endblock %}

@@ -10,13 +10,11 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
 from core.analyze import analyze
+from core.constants import STAGE_BY_ID, STAGE_IDS, TOPIC_NAMES
 from poc import config as poc_config, kb
 from poc.agent import SYSTEM_PROMPT, _build_tools
 
 from .deps import get_store
-
-TOPIC_NAMES = {"event_nature": "事件性质", "scope": "范围与病例数", "agent": "致病因素",
-               "food": "原因食品", "contamination": "污染环节与原因"}
 
 
 def _llm():
@@ -56,23 +54,26 @@ def build_context(state):
         eff_txt = f"{r.get('measure', '效应')}={eff:.2f}" if isinstance(eff, (int, float)) else "无法计算"
         p = r.get("p_fisher_two_sided")
         p_txt = f"P={p:.4f}" if isinstance(p, (int, float)) else "P=—"
-        associations.append(f"{r['meal_id']}/{r['food_id']} {eff_txt} {p_txt}")
+        associations.append(f"{r['food_id']} {eff_txt} {p_txt}")
 
     inc = stats["incubation"]
     incubation = (f"中位 {inc['median']:.1f} 小时，范围 {inc['minimum']:.1f}–{inc['maximum']:.1f} 小时"
                   if inc.get("n") else "现有资料不足以计算")
 
-    confirmed = [k for k, v in (state["confirmations"] or {}).items() if v.get("disposition") == "confirmed"]
-
     conclusions = {r["topic"]: r for r in state["conclusions"]}
     samples = ["；".join(
-        f"{s['id']}({s.get('source') or s.get('kind') or '—'})："
+        f"{s['id']}({s.get('source') or s.get('category') or '—'})："
         + "；".join(f"{t.get('item')} {t.get('result')}" for t in (s.get("tests") or []))
     ) for s in state["samples"]] or ["无"]
 
+    stages = {sid: (state["stages"].get(sid) or {}).get("status", "pending") for sid in STAGE_IDS}
+
     return {
-        "event": {k: event.get(k) for k in ("id", "title", "scenario", "lead", "location",
-                                            "received_at", "data_cutoff", "population_size")},
+        "event": {k: event.get(k) for k in ("id", "title", "lead", "place_type", "region",
+                                            "address", "received_at", "occurred_at",
+                                            "exposure_at", "investigation_end", "source_place_type",
+                                            "source_address", "population_size", "population_basis",
+                                            "population_known", "study_design")},
         "definition": {"label": definition.get("label"), "text": definition.get("text"),
                        "start": definition.get("start"), "end": definition.get("end"),
                        "symptoms_any": definition.get("symptoms_any") or [],
@@ -82,7 +83,7 @@ def build_context(state):
         "symptoms": symptoms,
         "associations": associations,
         "incubation": incubation,
-        "confirmed_nodes": confirmed,
+        "stages": stages,
         "conclusions": conclusions,
         "samples": samples,
     }
@@ -92,16 +93,18 @@ def context_markdown(ctx):
     d = ctx["definition"]
     ev = ctx["event"]
     lines = [
-        f"事件：{ev['title']}（编号 {ev['id']}，{ev['scenario']}，地点 {ev.get('location') or '—'}，"
-        f"负责人 {ev.get('lead') or '—'}，资料截止 {ev.get('data_cutoff') or '—'}）。",
+        f"事件：{ev['title']}（编号 {ev['id']}，场所 {ev.get('place_type') or '—'}，"
+        f"地区 {ev.get('region') or '—'}，负责人 {ev.get('lead') or '—'}，"
+        f"接报 {ev.get('received_at') or '—'}）。",
         f"病例定义：{d.get('label') or '—'}——{d.get('text') or '—'}；时间 {d.get('start') or '—'} 至 "
         f"{d.get('end') or '—'}；纳入症状 {('、'.join(d.get('symptoms_any') or []) or '—')}；最低症状数 {d.get('minimum_symptoms')}。",
-        f"判定统计：符合病例定义 {ctx['counts'].get('case', 0)}，未发病 {ctx['counts'].get('noncase', 0)}，"
-        f"待核实 {ctx['counts'].get('pending', 0)}，排除 {ctx['counts'].get('excluded', 0)}；罹患率 {ctx['attack_rate']}。",
+        f"判定统计：确诊 {ctx['counts'].get('确诊', 0)}、可能 {ctx['counts'].get('可能', 0)}、"
+        f"疑似 {ctx['counts'].get('疑似', 0)}、未发病 {ctx['counts'].get('未发病', 0)}、"
+        f"排除 {ctx['counts'].get('排除', 0)}、待定 {ctx['counts'].get('待定', 0)}；罹患率 {ctx['attack_rate']}。",
         f"症状谱：{ctx['symptoms']}。",
         f"暴露关联（效应量 + Fisher P）：{('；'.join(ctx['associations']) or '无')}。",
         f"潜伏期：{ctx['incubation']}。",
-        f"已确认流程节点：{'、'.join(ctx['confirmed_nodes']) or '无'}。",
+        f"阶段状态：{'；'.join(f'{STAGE_BY_ID[sid]["name"]}={st}' for sid, st in ctx['stages'].items())}。",
         f"样本：{'；'.join(ctx['samples'])}。",
     ]
     for topic, r in ctx["conclusions"].items():

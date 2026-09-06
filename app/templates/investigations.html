@@ -1,5 +1,0 @@
-{% extends "base.html" %}{% block title %}我的调查{% endblock %}{% block content %}
-<h1>我的调查</h1>
-<a href="/investigations/new">＋ 新建事件</a>
-<ul>{% for e in events %}<li><a href="/investigations/{{ e.id }}">{{ e.title }}</a>（{{ e.id }} · rev {{ e.revision }}）</li>{% endfor %}</ul>
-{% endblock %}

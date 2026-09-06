@@ -64,3 +64,34 @@ def test_association_significant():
     assert assoc["measure"] == "RR"
     assert assoc["effect"] > 1
     assert assoc["p_fisher_two_sided"] < 0.05
+
+
+def test_epi_link_excludes_universal_food():
+    """米饭人人皆吃，不应作为「可能」的流行病学关联依据。"""
+    s = Store(":memory:")
+    s.create_event("EV-1", "x")
+    s.update_event("EV-1", {"population_size": 10, "population_known": 1}, "web", "x")
+    s.set_definition("EV-1", {
+        "start": "2024-01-01T00:00:00", "end": "2024-01-06T23:59:59",
+        "symptoms_any": ["呕吐"], "minimum_symptoms": 1,
+        "probable": {"require_epi_link": True}, "confirmed": {"require_lab": True},
+    }, "web", "x")
+    people, exps = [], []
+    for i in range(10):
+        ill = i < 2
+        people.append({"id": f"P{i:03d}", "illness_status": "ill" if ill else "well",
+                       "onset": "2024-01-03T12:00:00" if ill else None,
+                       "symptoms": {"呕吐": True} if ill else {}})
+        exps.append({"id": f"E{i:03d}a", "person_id": f"P{i:03d}", "food_id": "米饭",
+                     "consumed": 1, "ate_at": "2024-01-02T12:00:00", "incubation_anchor": 1})
+        exps.append({"id": f"E{i:03d}b", "person_id": f"P{i:03d}", "food_id": "凉拌菜",
+                     "consumed": 1 if i == 5 else 0, "ate_at": "2024-01-02T12:00:00",
+                     "incubation_anchor": 1})
+    s.upsert_people("EV-1", people, "web", "x")
+    s.upsert_exposures("EV-1", exps, "web", "x")
+    s.upsert_samples("EV-1", [{"id": "S1", "category": "biological", "person_id": "P000",
+                               "tests": [{"item": "金葡菌", "result": "检出"}]}], "web", "x")
+    stats = analyze(s.load("EV-1"))
+    assert stats["counts"]["确诊"] == 1
+    assert stats["counts"].get("可能", 0) == 0  # P001 与确诊 P000 仅共享米饭（通用食品），不判可能
+    assert stats["counts"]["疑似"] == 1

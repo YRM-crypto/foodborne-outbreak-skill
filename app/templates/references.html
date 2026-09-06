@@ -1,7 +1,0 @@
-{% extends "base.html" %}{% block content %}
-<h1>查资料</h1>
-<form method="post" action="/references/search">
-<input name="q" placeholder="输入病原、症状或关键词" style="width:60%"><button>检索</button></form>
-{% if summary %}<h2>参考</h2><pre>{{ summary }}</pre>{% endif %}
-{% if hits %}<h2>命中</h2><ul>{% for h in hits %}<li>{{ h.text[:200] }} <em>({{ h.locator }})</em></li>{% endfor %}</ul>{% endif %}
-{% endblock %}
