@@ -1,34 +1,66 @@
-import unittest
+"""core/analyze.py：派生指标（症状/三间/年龄段/潜伏期/四格表/罹患率）。"""
 from core.analyze import analyze
+from core.store import Store
 
-def _event():
-    return {
-        "event": {"id": "EV", "title": "学校聚集性胃肠炎", "timezone": "Asia/Shanghai", "population_complete": 0,
-                  "population_size": None, "data_cutoff": None},
-        "definition": {"version": 1, "text": "本次事件病例定义",
-                       "start": "2026-09-01T00:00:00+08:00", "end": "2026-09-03T23:59:59+08:00",
-                       "symptoms_any": ["呕吐", "腹泻"], "minimum_symptoms": 1, "require_lab": False,
-                       "locations": [], "populations": []},
-        "people": [
-            {"id": "P1", "illness_status": "ill", "onset": "2026-09-01T18:00:00+08:00",
-             "symptoms": {"呕吐": True, "腹泻": True}, "sex": "male", "age": 12,
-             "recovery": "2026-09-02T12:00:00+08:00"},
-            {"id": "P2", "illness_status": "well", "onset": None, "symptoms": {}, "sex": "female", "age": 13},
-        ],
-        "exposures": [{"id": "X1", "person_id": "P1", "meal_id": "M1", "food_id": "F1",
-                       "consumed": True, "ate_at": "2026-09-01T12:00:00+08:00", "incubation_anchor": True},
-                      {"id": "X2", "person_id": "P2", "meal_id": "M1", "food_id": "F1",
-                       "consumed": False, "ate_at": None, "incubation_anchor": False}],
-        "samples": [], "evidence": [], "conclusions": [], "confirmations": {},
-    }
 
-class TestAnalyze(unittest.TestCase):
-    def test_counts_and_incubation(self):
-        r = analyze(_event())
-        self.assertEqual(r["counts"]["case"], 1)
-        self.assertEqual(r["counts"]["noncase"], 1)
-        self.assertEqual(r["incubation"]["n"], 1)
-        self.assertAlmostEqual(r["incubation"]["median"], 6.0)
+def _state():
+    s = Store(":memory:")
+    s.create_event("EV-1", "某学校食堂呕吐")
+    s.update_event("EV-1", {"place_type": "学校食堂", "population_size": 40,
+                            "population_known": 1}, "web", "基本信息")
+    s.set_definition("EV-1", {
+        "label": "餐后呕吐者", "text": "1月2-5日食堂就餐后呕吐",
+        "start": "2024-01-01T00:00:00", "end": "2024-01-06T23:59:59",
+        "locations": ["某中学"], "symptoms_any": ["呕吐"], "minimum_symptoms": 1,
+        "probable": {"require_epi_link": True}, "confirmed": {"require_lab": True},
+    }, "web", "定义")
+    people, exps = [], []
+    for i in range(40):
+        ill = i < 20
+        people.append({"id": f"P{i:03d}", "illness_status": "ill" if ill else "well",
+                       "onset": f"2024-01-03T{10 + i % 10:02d}:00:00" if ill else None,
+                       "age": 15 + i % 5, "sex": "男" if i % 2 == 0 else "女",
+                       "location": "某中学", "symptoms": {"呕吐": True, "腹泻": i % 3 == 0} if ill else {}})
+        exps.append({"id": f"E{i:03d}", "person_id": f"P{i:03d}", "meal_id": "午餐",
+                     "food_id": "凉拌菜", "consumed": (1 if i % 4 != 0 else 0) if ill else (1 if i % 7 == 0 else 0),
+                     "ate_at": "2024-01-02T12:00:00", "incubation_anchor": 1})
+    s.upsert_people("EV-1", people, "web", "个案")
+    s.upsert_exposures("EV-1", exps, "web", "暴露")
+    s.upsert_samples("EV-1", [{"id": "S1", "category": "biological", "person_id": "P000",
+                               "source": "肛拭", "tests": [{"item": "金葡菌", "result": "检出"}]}], "web", "样本")
+    return s.load("EV-1")
 
-if __name__ == "__main__":
-    unittest.main()
+
+def test_counts_and_attack_rate():
+    stats = analyze(_state())
+    assert stats["case_count"] == 20
+    assert stats["confirmed_count"] == 1
+    assert stats["attack_rate"]["value"] == 0.5  # 20/40
+
+
+def test_symptoms_standardized():
+    stats = analyze(_state())
+    by_name = {r["symptom"]: r for r in stats["symptoms"]}
+    assert by_name["呕吐"]["numerator"] == 20
+    assert by_name["腹泻"]["numerator"] > 0
+
+
+def test_age_groups():
+    stats = analyze(_state())
+    total = sum(g["cases"] for g in stats["age_groups"])
+    assert total == 20
+    assert all(g["label"] in ("7–19岁", "20–59岁") for g in stats["age_groups"])
+
+
+def test_incubation_computed():
+    stats = analyze(_state())
+    assert stats["incubation"]["n"] == 20
+    assert stats["incubation"]["minimum"] >= 0
+
+
+def test_association_significant():
+    stats = analyze(_state())
+    assoc = next(a for a in stats["associations"] if a["food_id"] == "凉拌菜")
+    assert assoc["measure"] == "RR"
+    assert assoc["effect"] > 1
+    assert assoc["p_fisher_two_sided"] < 0.05

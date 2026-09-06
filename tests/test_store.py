@@ -1,37 +1,69 @@
-import unittest
-import tempfile
-from pathlib import Path
+"""core/store.py：新数据模型（附表1-8 字段 + 版本化定义 + 阶段状态）。"""
+import pytest
+
 from core.store import Store
 
-class TestStore(unittest.TestCase):
-    def setUp(self):
-        self.dir = tempfile.mkdtemp()
-        self.store = Store(Path(self.dir) / "t.db")
 
-    def tearDown(self):
-        self.store.close()
+@pytest.fixture()
+def store():
+    s = Store(":memory:")
+    yield s
+    s.close()
 
-    def test_create_and_list_events(self):
-        self.store.create_event("EV-001", "学校聚集性胃肠炎", "closed-cohort", "张三")
-        events = self.store.list_events()
-        self.assertEqual(len(events), 1)
-        self.assertEqual(events[0]["id"], "EV-001")
 
-    def test_audit_timeline_appends(self):
-        self.store.create_event("EV-001", "学校聚集性胃肠炎", "closed-cohort", "张三")
-        self.store.add_evidence("EV-001", {"id": "E1", "title": "接报记录", "status": "available",
-            "text": "接报：多人呕吐腹泻", "locator": "原始记录"}, "张三", "接收材料")
-        tl = self.store.timeline("EV-001")
-        self.assertGreaterEqual(len(tl), 2)
-        self.assertEqual(tl[0]["actor"], "张三")
+def test_create_and_update_event(store):
+    store.create_event("EV-1", "某学校食堂呕吐", lead="一组")
+    store.update_event("EV-1", {"place_type": "学校食堂", "population_size": 100,
+                                "population_known": 1, "is_foodborne": "yes"}, "web", "补基本信息")
+    ev = store.get_event("EV-1")
+    assert ev["place_type"] == "学校食堂"
+    assert ev["population_size"] == 100
+    assert ev["population_known"] == 1
 
-    def test_bump_revision(self):
-        self.store.create_event("EV-001", "学校聚集性胃肠炎", "closed-cohort", "张三")
-        rev1 = self.store.get_event("EV-001")["revision"]
-        self.store.set_definition("EV-001", {"label": "v1", "text": "定义", "start": "2026-09-01T00:00:00+08:00",
-            "end": "2026-09-03T23:59:59+08:00", "symptoms_any": ["呕吐"], "minimum_symptoms": 1}, "张三", "制定定义")
-        rev2 = self.store.get_event("EV-001")["revision"]
-        self.assertGreater(rev2, rev1)
 
-if __name__ == "__main__":
-    unittest.main()
+def test_update_event_rejects_unknown_field(store):
+    store.create_event("EV-1", "x")
+    with pytest.raises(ValueError):
+        store.update_event("EV-1", {"bogus": 1}, "web", "x")
+
+
+def test_definition_versioning(store):
+    store.create_event("EV-1", "x")
+    v1 = store.set_definition("EV-1", {"text": "v1", "symptoms_any": ["呕吐"]}, "web", "初版")
+    v2 = store.set_definition("EV-1", {"text": "v2", "symptoms_any": ["呕吐", "腹泻"]}, "web", "调整")
+    assert v1 == 1 and v2 == 2
+    assert store.load("EV-1")["definition"]["version"] == 2
+
+
+def test_upsert_tables_and_load(store):
+    store.create_event("EV-1", "x")
+    store.upsert_people("EV-1", [{"id": "P1", "illness_status": "ill", "symptoms": {"呕吐": True}}], "web", "个案")
+    store.upsert_exposures("EV-1", [{"id": "E1", "person_id": "P1", "food_id": "凉拌菜", "consumed": 1}], "web", "暴露")
+    store.upsert_foods("EV-1", [{"id": "凉拌菜", "category": "蔬菜及蔬菜制品"}], "web", "食品清单")
+    store.upsert_samples("EV-1", [{"id": "S1", "category": "biological", "person_id": "P1",
+                                   "tests": [{"item": "副溶血性弧菌", "result": "检出"}]}], "web", "样本")
+    store.add_hygiene("EV-1", [{"id": "H1", "aspect": "加工过程", "item": "生熟分开", "finding": "无明显生熟标记", "problem": 1}], "web", "卫生学")
+    store.add_control("EV-1", [{"id": "C1", "measure": "封存", "target": "凉拌菜", "implemented": "已封存"}], "web", "控制")
+    state = store.load("EV-1")
+    assert len(state["people"]) == 1
+    assert state["foods"][0]["category"] == "蔬菜及蔬菜制品"
+    assert state["samples"][0]["tests"][0]["result"] == "检出"
+    assert state["hygiene"][0]["problem"] == 1
+    assert state["controls"][0]["measure"] == "封存"
+
+
+def test_set_stage_valid_and_invalid(store):
+    store.create_event("EV-1", "x")
+    store.set_stage("EV-1", "case_def", "done", "web", "已定定义")
+    assert store.load("EV-1")["stages"]["case_def"]["status"] == "done"
+    with pytest.raises(ValueError):
+        store.set_stage("EV-1", "bogus", "done", "web")
+    with pytest.raises(ValueError):
+        store.set_stage("EV-1", "case_def", "bogus", "web")
+
+
+def test_timeline_audit(store):
+    store.create_event("EV-1", "x")
+    store.set_stage("EV-1", "intake", "done", "web", "接报完成")
+    t = store.timeline("EV-1")
+    assert any(r["action"].startswith("stage:") for r in t)
