@@ -37,11 +37,14 @@ uv run python -m poc.ingest
 uv run python -m uvicorn poc.agent:app --port 8000
 
 # 4. 起 Open WebUI（:3000）
+#    Apple Silicon + colima(VZ) 上需用修复版镜像（cryptography 48 会 SIGILL，见 Dockerfile.openwebui）
+docker build -f poc/Dockerfile.openwebui -t open-webui-arm64 .
 docker run -d -p 3000:8080 --name open-webui \
+  -v open-webui:/app/backend/data \
   -e OPENAI_API_BASE_URLS="http://host.docker.internal:8000/v1" \
   -e OPENAI_API_KEYS="ollama" \
   -e ENABLE_OPENAI_API=true \
-  ghcr.io/open-webui/open-webui:main
+  open-webui-arm64
 ```
 
 打开 http://localhost:3000，在 Open WebUI 的 OpenAI 连接里选 `qwen3:30b-a3b-instruct-2507-q4_K_M` 即可对话。

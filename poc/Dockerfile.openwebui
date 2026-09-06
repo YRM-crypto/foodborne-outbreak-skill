@@ -1,0 +1,4 @@
+# Open WebUI 在 Apple Silicon + colima(VZ) 上会因 cryptography 48.0.0 的 Rust wheel
+# 触发 SIGILL（Illegal instruction）。钉到 45.0.1 规避（满足 joserfc 的 >=45.0.1 依赖）。
+FROM ghcr.io/open-webui/open-webui:main
+RUN pip install --no-cache-dir "cryptography==45.0.1"
