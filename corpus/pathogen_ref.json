@@ -1,0 +1,12 @@
+[
+  {"name":"诺如病毒","category":"病毒","latency_min":8,"latency_max":48,"symptoms":["呕吐","腹泻","腹痛","恶心","发热"],"foods":["熟肉制品","贝类","生食蔬果"],"specimen":"粪便(肛拭子)","criterion":"临床表现+生物标本阳性"},
+  {"name":"副溶血性弧菌","category":"细菌","latency_min":4,"latency_max":24,"symptoms":["腹痛","腹泻","恶心","呕吐","发热"],"foods":["海产品","交叉污染食品"],"specimen":"粪便(肛拭子)","criterion":"临床表现+生物标本检出"},
+  {"name":"非伤寒沙门氏菌","category":"细菌","latency_min":6,"latency_max":24,"symptoms":["腹泻","腹痛","发热","呕吐"],"foods":["酱卤肉","蛋制品","糕点","肉夹馍"],"specimen":"粪便(肛拭子)","criterion":"临床表现+生物标本检出"},
+  {"name":"金黄色葡萄球菌肠毒素","category":"细菌毒素","latency_min":1,"latency_max":9,"symptoms":["恶心","呕吐","腹绞痛"],"foods":["酱卤肉","凉皮","米饭","牛奶","奶油糕点"],"specimen":"粪便、呕吐物","criterion":"临床表现+标本检出毒素/产毒菌"},
+  {"name":"蜡样芽胞杆菌","category":"细菌","latency_min":1,"latency_max":16,"symptoms":["呕吐","腹痛","腹泻"],"foods":["剩米饭","面条","米粉"],"specimen":"粪便、呕吐物","criterion":"临床表现+检出≥1×10⁵CFU/g或mL"},
+  {"name":"志贺氏菌","category":"细菌","latency_min":3,"latency_max":50,"symptoms":["腹泻","腹痛","发热","呕吐","脓血便"],"foods":["酱卤肉","凉皮","生食蔬果"],"specimen":"粪便(肛拭子)","criterion":"临床表现+生物标本检出"},
+  {"name":"单核细胞增生李斯特氏菌","category":"细菌","latency_min":8,"latency_max":336,"symptoms":["腹泻","发热","败血症","脑膜炎"],"foods":["冷冻饮品","生食蔬菜","熟肉"],"specimen":"粪便、血液、脑脊液","criterion":"临床表现+生物标本检出"},
+  {"name":"亚硝酸盐","category":"化学物","latency_min":0.2,"latency_max":3,"symptoms":["头晕","发绀","恶心","呕吐","心悸","呼吸困难"],"foods":["熟肉","腌制蔬菜"],"specimen":"呕吐物/胃内容物、血液","criterion":"临床表现+明确暴露史，或标本检出"},
+  {"name":"有机磷农药","category":"化学物","latency_min":0.2,"latency_max":2,"symptoms":["头晕","多汗","流涎","瞳孔缩小","肌束震颤"],"foods":["喷洒农药的蔬果"],"specimen":"呕吐物/胃内容物","criterion":"临床表现+明确暴露史，或标本检出"},
+  {"name":"河鲀毒素","category":"有毒动物","latency_min":0.2,"latency_max":4,"symptoms":["口唇舌肢端麻木","运动麻痹","呼吸麻痹","恶心","呕吐"],"foods":["河鲀鱼","织纹螺"],"specimen":"呕吐物、血液、尿液","criterion":"临床表现+明确暴露史，或标本检出"}
+]
