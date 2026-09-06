@@ -6,9 +6,20 @@ from pathlib import Path
 
 from app.config import Config
 from core.store import Store
+from core.analyze import analyze
 from assistant.orchestrator import render_gaps
 
 HERE = Path(__file__).resolve().parent
+
+
+def render_analysis(stats):
+    c = stats["counts"]
+    lines = [f"当前登记 {sum(c.values())} 人，符合病例定义 {c.get('case', 0)} 人，"
+             f"明确未发病 {c.get('noncase', 0)} 人，待核实 {c.get('pending', 0)} 人，"
+             f"定义范围外/不符合 {c.get('excluded', 0)} 人。"]
+    for w in stats.get("warnings", []):
+        lines.append(f"注意：{w}")
+    return "\n".join(lines)
 
 
 def compute_gaps(state):
@@ -81,6 +92,13 @@ def create_app(db_path=None, vector_db_path=None, xls_path=None):
         gaps = compute_gaps(state)
         return templates.TemplateResponse(request, "check.html",
                                           {"event": state["event"], "gaps": gaps, "text": render_gaps(gaps)})
+
+    @app.get("/investigations/{event_id}/analyze")
+    def analyze_route(request: Request, event_id: str):
+        state = app.state.store.load(event_id)
+        stats = analyze(state)
+        return templates.TemplateResponse(request, "analyze.html",
+                                          {"event": state["event"], "stats": stats, "text": render_analysis(stats)})
 
     return app
 
