@@ -59,3 +59,12 @@ export async function kbDoc(id: string, lib: string) {
 export async function kbSearch(q: string, lib: string) {
   return (await api.get("/kb/search", { params: { q, lib } })).data;
 }
+
+// —— AI 助手 ——
+export async function assistantChat(payload: {
+  event_id: string | null;
+  question: string;
+  history: { role: string; content: string }[];
+}) {
+  return (await api.post("/assistant/chat", payload)).data;
+}

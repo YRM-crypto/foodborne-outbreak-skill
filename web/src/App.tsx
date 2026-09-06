@@ -21,7 +21,7 @@ export default function App() {
             <Route path="/workspace" element={<Navigate to="/cases" replace />} />
             <Route path="/workspace/:eventId" element={<WorkspaceView />} />
             <Route path="/report" element={<ReportView />} />
-            <Route path="/assistant" element={<AssistantView />} />
+            <Route path="/assistant/:eventId?" element={<AssistantView />} />
           </Route>
         </Routes>
       </Suspense>

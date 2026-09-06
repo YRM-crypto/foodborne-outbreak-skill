@@ -1,4 +1,4 @@
-import { ArrowLeftOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, RobotOutlined } from "@ant-design/icons";
 import { Alert, Button, Descriptions, Space, Spin, Steps, Tabs, Tag, Typography, message } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -74,6 +74,9 @@ export default function WorkspaceView() {
       <Space style={{ marginBottom: 12 }} wrap>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate("/cases")}>
           返回
+        </Button>
+        <Button icon={<RobotOutlined />} onClick={() => navigate(`/assistant/${event.id}`)}>
+          问 AI
         </Button>
         <Typography.Title level={4} style={{ margin: 0 }}>
           {event.title}

@@ -137,9 +137,9 @@ async def collect_sources(question):
             continue
     seen, out = set(), []
     for r in refs:
-        fp = r.get("file_path", "")
-        if fp and fp not in seen:
-            seen.add(fp)
+        key = r.get("doc_id", "")
+        if key and key not in seen:
+            seen.add(key)
             out.append(r)
     return out
 
@@ -167,4 +167,5 @@ async def answer(event_id, question, history=None):
     agent = _get_agent()
     result = await agent.ainvoke({"messages": messages})
     return {"answer": _last_content(result), "context": ctx,
+            "context_md": context_markdown(ctx) if ctx else None,
             "sources": await collect_sources(question)}
