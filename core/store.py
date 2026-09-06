@@ -114,6 +114,23 @@ class Store:
         rows = self.conn.execute("SELECT * FROM audit WHERE event_id=? ORDER BY seq DESC", (event_id,)).fetchall()
         return [dict(r) for r in rows]
 
+    def update_event(self, event_id, fields, actor, reason):
+        allowed = {"title", "lead", "received_at", "location", "data_cutoff", "timezone",
+                   "population_size", "population_complete", "population_basis", "urgent_flags"}
+        bad = set(fields) - allowed
+        if bad:
+            raise ValueError(f"events 不可更新字段 {sorted(bad)}")
+        self.get_event(event_id)
+        if not fields:
+            return self.get_event(event_id)["revision"]
+        sets = ", ".join(f"{c}=?" for c in fields)
+        self.conn.execute(f"UPDATE events SET {sets} WHERE id=?",
+                          [*[_enc(fields[c]) for c in fields], event_id])
+        rev = self._bump(event_id)
+        self._audit(event_id, rev, actor, "update_event", reason, fields)
+        self.conn.commit()
+        return rev
+
     def _set_row(self, table, event_id, keycol, value, actor, action, reason):
         cols = [c["name"] for c in self.conn.execute(f"PRAGMA table_info({table})")]
         for c in value:
@@ -153,6 +170,16 @@ class Store:
             self._set_row("people", event_id, "id", p, actor, "upsert_people", reason)
         return self.get_event(event_id)["revision"]
 
+    def upsert_exposures(self, event_id, exposures, actor, reason):
+        for e in exposures:
+            self._set_row("exposures", event_id, "id", e, actor, "upsert_exposures", reason)
+        return self.get_event(event_id)["revision"]
+
+    def upsert_samples(self, event_id, samples, actor, reason):
+        for s in samples:
+            self._set_row("samples", event_id, "id", s, actor, "upsert_samples", reason)
+        return self.get_event(event_id)["revision"]
+
     def add_evidence(self, event_id, record, actor, reason):
         return self._set_row("evidence", event_id, "id", record, actor, "add_evidence", reason)
 
@@ -182,24 +209,26 @@ class Store:
 
     def load(self, event_id):
         event = self.get_event(event_id)
+
         def _j(x):
             return json.loads(x) if isinstance(x, str) else (x or {})
+
+        def _decode(row, keys):
+            if row is None:
+                return None
+            row = dict(row)
+            for k in keys:
+                row[k] = _j(row.get(k))
+            return row
+
         d = self.conn.execute("SELECT * FROM definition WHERE event_id=?", (event_id,)).fetchone()
-        people = self._rows("people", event_id)
-        for p in people:
-            p["symptoms"] = _j(p.get("symptoms"))
-            p["evidence_ids"] = _j(p.get("evidence_ids"))
-        exposures = self._rows("exposures", event_id)
-        samples = self._rows("samples", event_id)
-        for s in samples:
-            s["tests"] = _j(s.get("tests"))
+        definition = _decode(d, ("locations", "populations", "symptoms_any", "evidence_ids"))
+        people = [_decode(r, ("symptoms", "evidence_ids", "adjudication")) for r in self._rows("people", event_id)]
+        exposures = [_decode(r, ("evidence_ids",)) for r in self._rows("exposures", event_id)]
+        samples = [_decode(r, ("tests", "evidence_ids")) for r in self._rows("samples", event_id)]
         evidence = self._rows("evidence", event_id)
-        for e in evidence:
-            e["evidence_ids"] = _j(e.get("evidence_ids"))
-        conclusions = self._rows("conclusions", event_id)
-        for c in conclusions:
-            c["evidence_ids"] = _j(c.get("evidence_ids"))
-        confirmations = {r["node"]: dict(r) for r in self._rows("confirmations", event_id)}
-        return {"event": event, "definition": dict(d) if d else None, "people": people,
+        conclusions = [_decode(r, ("evidence_ids",)) for r in self._rows("conclusions", event_id)]
+        confirmations = {r["node"]: _decode(r, ("evidence_ids",)) for r in self._rows("confirmations", event_id)}
+        return {"event": event, "definition": definition, "people": people,
                 "exposures": exposures, "samples": samples, "evidence": evidence,
                 "conclusions": conclusions, "confirmations": confirmations}
