@@ -1,11 +1,13 @@
-import { PlusOutlined } from "@ant-design/icons";
+import { ExperimentOutlined, PlusOutlined } from "@ant-design/icons";
 import {
   Button,
+  Card,
   Form,
   Input,
   Modal,
   Select,
   Space,
+  Steps,
   Table,
   Tag,
   Typography,
@@ -13,7 +15,7 @@ import {
 } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createEvent, listEvents } from "../api/client";
+import { createEvent, listEvents, seedDemo } from "../api/client";
 
 const scenarioLabels: Record<string, string> = {
   "closed-cohort": "封闭队列",
@@ -24,6 +26,7 @@ export default function CasesView() {
   const navigate = useNavigate();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [seeding, setSeeding] = useState(false);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
 
@@ -56,6 +59,20 @@ export default function CasesView() {
     }
   };
 
+  const onSeed = async () => {
+    setSeeding(true);
+    try {
+      await seedDemo();
+      message.success("已生成演示事件，正在打开…");
+      await load();
+      navigate("/workspace/EV-DEMO-001");
+    } catch (e: any) {
+      message.error("生成失败：" + (e?.response?.data?.detail ?? e?.message ?? e));
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   const columns = [
     { title: "事件编号", dataIndex: "id", key: "id" },
     { title: "标题", dataIndex: "title", key: "title" },
@@ -85,6 +102,30 @@ export default function CasesView() {
           新建事件
         </Button>
       </Space>
+
+      {!loading && events.length === 0 && (
+        <Card style={{ marginBottom: 16, textAlign: "center" }}>
+          <Typography.Title level={5}>开始你的第一次暴发调查</Typography.Title>
+          <Steps
+            size="small"
+            direction="vertical"
+            style={{ maxWidth: 440, margin: "16px auto", textAlign: "left" }}
+            items={[
+              { title: "新建事件", description: "登记事件编号、标题、类型与负责人" },
+              { title: "录入数据", description: "病例定义、病例与未发病名单、暴露史" },
+              { title: "分析与报告", description: "查看流行曲线与食品关联，生成调查报告" },
+            ]}
+          />
+          <Space>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+              新建事件
+            </Button>
+            <Button icon={<ExperimentOutlined />} loading={seeding} onClick={onSeed}>
+              生成演示数据
+            </Button>
+          </Space>
+        </Card>
+      )}
 
       <Table
         rowKey="id"

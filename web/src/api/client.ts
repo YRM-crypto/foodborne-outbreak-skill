@@ -12,6 +12,9 @@ export async function getEvent(id: string) {
 export async function createEvent(payload: any) {
   return (await api.post("/events", payload)).data;
 }
+export async function seedDemo() {
+  return (await api.post("/events/seed-demo")).data;
+}
 export async function updateEvent(id: string, payload: any) {
   return (await api.patch(`/events/${id}`, payload)).data;
 }

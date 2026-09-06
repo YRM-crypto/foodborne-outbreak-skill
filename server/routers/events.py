@@ -35,6 +35,14 @@ def create_event(body: CreateEvent, store: Store = Depends(get_store),
         raise _http(e)
 
 
+@router.post("/seed-demo")
+def seed_demo(store: Store = Depends(get_store)):
+    from ..seed import EVENT_ID, seed_demo_event
+
+    ev = seed_demo_event(store)
+    return {"created": ev is not None, "event_id": EVENT_ID}
+
+
 @router.get("")
 def list_events(store: Store = Depends(get_store)):
     return store.list_events()

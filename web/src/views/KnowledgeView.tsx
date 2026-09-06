@@ -17,6 +17,19 @@ import { kbDoc, kbDocs, kbSearch } from "../api/client";
 
 const { Text, Paragraph } = Typography;
 
+// 把 LightRAG chunk_id（如 standard:判定及处置技术指南-chunk-002）解析成可读来源名
+function sourceLabel(chunkId: string): string {
+  if (!chunkId) return "";
+  const docId = chunkId.includes("-chunk-") ? chunkId.split("-chunk-")[0] : chunkId;
+  const [kind, name] = docId.split(":");
+  if (kind === "standard") return `规范《${name}》`;
+  if (kind === "pathogen") return `致病因子·${name}`;
+  if (kind === "report") return `结案报告·${name}`;
+  if (kind === "monitoring") return `监测数据·第${name}批`;
+  if (docId === "checklist") return "调查清单";
+  return docId;
+}
+
 interface DocMeta {
   id: string;
   chars: number;
@@ -130,7 +143,7 @@ export default function KnowledgeView() {
                                 {c.content}
                               </Paragraph>
                               <Space size={8} wrap>
-                                <Tag color="blue">{c.file_path}</Tag>
+                                <Tag color="blue">{sourceLabel(c.chunk_id)}</Tag>
                                 <Text type="secondary" style={{ fontSize: 12 }}>
                                   {c.chunk_id}
                                 </Text>
