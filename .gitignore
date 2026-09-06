@@ -11,3 +11,6 @@ docs/
 assets/raw/
 corpus/standards/
 corpus/reports/
+poc/rag_data/
+poc/.env
+poc/checkpoints.db
