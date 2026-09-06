@@ -6,8 +6,27 @@ from pathlib import Path
 
 from app.config import Config
 from core.store import Store
+from assistant.orchestrator import render_gaps
 
 HERE = Path(__file__).resolve().parent
+
+
+def compute_gaps(state):
+    event = state["event"]
+    gaps = []
+    if not event.get("received_at"):
+        gaps.append({"id": "intake", "stage": "接报与核实", "title": "补充接报时间",
+                     "why": "建立时间基线", "table": "接报记录", "basis": "S2012 §3.1"})
+    if not state["definition"]:
+        gaps.append({"id": "case_def", "stage": "病例定义", "title": "尚无病例定义",
+                     "why": "无法统一病例纳入标准", "table": "病例定义记录", "basis": "S2012 §4.2"})
+    if not state["people"]:
+        gaps.append({"id": "individual", "stage": "个案调查", "title": "尚无人员/病例资料",
+                     "why": "无法开展描述性与分析性分析", "table": "附表3-2", "basis": "S2012 §4.3–4.4"})
+    if not state["evidence"]:
+        gaps.append({"id": "evidence", "stage": "证据整理", "title": "尚未录入任何材料",
+                     "why": "结论需有材料依据", "table": "附表3-7", "basis": "S2012 §6"})
+    return gaps
 
 
 def create_app(db_path=None, vector_db_path=None, xls_path=None):
@@ -55,6 +74,13 @@ def create_app(db_path=None, vector_db_path=None, xls_path=None):
         timeline = app.state.store.timeline(event_id)
         return templates.TemplateResponse(request, "investigation.html",
                                           {"state": state, "timeline": timeline})
+
+    @app.get("/investigations/{event_id}/check")
+    def check(request: Request, event_id: str):
+        state = app.state.store.load(event_id)
+        gaps = compute_gaps(state)
+        return templates.TemplateResponse(request, "check.html",
+                                          {"event": state["event"], "gaps": gaps, "text": render_gaps(gaps)})
 
     return app
 

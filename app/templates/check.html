@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% block content %}
+<h1>缺项提示 — {{ event.title }}</h1>
+<pre>{{ text }}</pre>
+<a href="/investigations/{{ event.id }}">返回事件</a>
+{% endblock %}
