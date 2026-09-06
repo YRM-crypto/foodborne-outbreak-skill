@@ -98,6 +98,10 @@ def _last_content(result):
     return msg.content if isinstance(msg.content, str) else str(msg.content)
 
 
+# MemorySaver 需要一个 thread_id。POC 单会话用固定值；多用户隔离后续按会话 id 派生。
+_AGENT_CONFIG = {"configurable": {"thread_id": "poc-session"}}
+
+
 def create_app():
     app = FastAPI(title="食源性疾病暴发调查智能体")
     agent = build_agent()
@@ -117,7 +121,7 @@ def create_app():
 
         if req.stream:
             async def gen():
-                result = await agent.ainvoke({"messages": messages})
+                result = await agent.ainvoke({"messages": messages}, config=_AGENT_CONFIG)
                 chunk = {"id": "chatcmpl-poc", "object": "chat.completion.chunk",
                          "model": config.LLM_MODEL,
                          "choices": [{"index": 0,
@@ -127,7 +131,7 @@ def create_app():
                 yield "data: [DONE]\n\n"
             return StreamingResponse(gen(), media_type="text/event-stream")
 
-        result = await agent.ainvoke({"messages": messages})
+        result = await agent.ainvoke({"messages": messages}, config=_AGENT_CONFIG)
         return {"id": "chatcmpl-poc", "object": "chat.completion", "created": 0,
                 "model": config.LLM_MODEL,
                 "choices": [{"index": 0,
