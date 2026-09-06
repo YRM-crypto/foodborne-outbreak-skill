@@ -115,22 +115,25 @@ def load_basis_docs():
     return docs
 
 
-def load_case_docs():
-    """案例库：结案报告 + 500 条监测数据。"""
+def load_case_docs(batch_size=50):
+    """案例库：结案报告 + 500 条监测数据（监测数据按 batch_size 打包，避免数百次串行抽取）。"""
     docs = []
     for p in sorted(config.REPORTS_DIR.glob("*.txt")):
         t = p.read_text(encoding="utf-8").strip()
         if t:
             docs.append((f"report:{p.stem}", t))
-    for e in load_xls_events(str(config.XLS_PATH)):
-        if e.get("card"):
-            docs.append((f"monitoring:{e['card']}", event_to_text(e)))
+    events = [e for e in load_xls_events(str(config.XLS_PATH)) if event_to_text(e).strip()]
+    for i in range(0, len(events), batch_size):
+        batch = events[i:i + batch_size]
+        docs.append((f"monitoring:{i // batch_size:03d}", "\n".join(event_to_text(e) for e in batch)))
     return docs
 
 
 async def ingest(rag, docs):
     await rag.initialize_storages()
-    for doc_id, text in docs:
+    n = len(docs)
+    for idx, (doc_id, text) in enumerate(docs, 1):
+        print(f"  [{idx}/{n}] {doc_id}（{len(text)} 字）", flush=True)
         await rag.ainsert(text, ids=[doc_id])
     await rag.finalize_storages()
 

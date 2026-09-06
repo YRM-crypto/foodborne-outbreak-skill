@@ -1,4 +1,4 @@
-"""一次性灌语料：`uv run python -m poc.ingest`（需 LLM key + 首次下载 embedding 模型）。"""
+"""一次性灌语料：`uv run python -m poc.ingest`（默认本地 Ollama，无需 key）。"""
 import asyncio
 
 from . import kb
