@@ -1,4 +1,4 @@
-import { CheckCircleOutlined, PlusOutlined } from "@ant-design/icons";
+import { PlusOutlined } from "@ant-design/icons";
 import {
   Button,
   Card,
@@ -14,59 +14,25 @@ import {
   message,
 } from "antd";
 import { useState } from "react";
-import { addEvidence, confirm, setConclusion } from "../../api/client";
+import { addEvidence, setConclusion } from "../../api/client";
+import { CONCLUSION_STATUS, CONCLUSION_TOPICS, CONTAMINATION_FACTORS, CONTAMINATION_LINKS } from "../../constants";
 
-const NODES = [
-  { key: "intake", title: "接报" },
-  { key: "definition", title: "病例定义" },
-  { key: "plan", title: "调查计划" },
-  { key: "analysis", title: "分析" },
-  { key: "evidence", title: "证据" },
-  { key: "conclusion", title: "结论" },
-  { key: "closure", title: "结案" },
-];
-
-const TOPICS = [
-  { key: "event_nature", name: "事件性质" },
-  { key: "scope", name: "范围与病例数" },
-  { key: "agent", name: "致病因素" },
-  { key: "food", name: "原因食品" },
-  { key: "contamination", name: "污染环节与原因" },
-];
-
-const STATUS_OPTS = [
-  { value: "hypothesis", label: "待验证假设" },
-  { value: "supported", label: "有证据支持的意见" },
-  { value: "undetermined", label: "尚不能判定" },
-  { value: "excluded", label: "排除意见" },
-];
+const STATUS_COLOR: Record<string, string> = {
+  confirmed: "green",
+  probable: "orange",
+  unknown: "default",
+  excluded: "red",
+};
 
 export default function EvidencePanel({ state, eventId, onRefresh }: any) {
-  const confirmations = state.confirmations ?? {};
   const evidence = state.evidence ?? [];
   const conclusions = state.conclusions ?? [];
 
-  const [confirmNote, setConfirmNote] = useState("");
   const [evOpen, setEvOpen] = useState(false);
   const [evForm] = Form.useForm();
+
   const [conclTopic, setConclTopic] = useState<string | null>(null);
   const [conclForm] = Form.useForm();
-
-  const doConfirm = async (node: string) => {
-    try {
-      await confirm(eventId, {
-        node,
-        role: "调查员",
-        note: confirmNote || "工作台确认",
-        evidence_ids: [],
-        disposition: "confirmed",
-      });
-      message.success(`已确认「${NODES.find((n) => n.key === node)?.title}」`);
-      onRefresh();
-    } catch (e: any) {
-      message.error("确认失败：" + (e?.response?.data?.detail ?? e?.message ?? e));
-    }
-  };
 
   const onAddEvidence = async () => {
     const values = await evForm.validateFields();
@@ -84,10 +50,12 @@ export default function EvidencePanel({ state, eventId, onRefresh }: any) {
   const openConclusion = (topic: string) => {
     const cur = conclusions.find((c: any) => c.topic === topic);
     conclForm.setFieldsValue({
-      status: cur?.status ?? "hypothesis",
+      status: cur?.status ?? "unknown",
       statement: cur?.statement ?? "",
       reason: cur?.reason ?? "",
       limitations: cur?.limitations ?? "",
+      link: cur?.link ?? undefined,
+      factor: cur?.factor ?? undefined,
       evidence_ids: cur?.evidence_ids ?? [],
     });
     setConclTopic(topic);
@@ -107,35 +75,6 @@ export default function EvidencePanel({ state, eventId, onRefresh }: any) {
 
   return (
     <div>
-      <Card title="调查流程节点确认" style={{ marginBottom: 16 }}>
-        <Typography.Paragraph type="secondary">
-          按调查流程逐步确认节点，确认后在前端流程图中体现，并写入审计日志。
-        </Typography.Paragraph>
-        <Space direction="vertical" style={{ width: "100%" }}>
-          <Input
-            placeholder="确认备注（可选）"
-            value={confirmNote}
-            onChange={(e) => setConfirmNote(e.target.value)}
-            style={{ maxWidth: 420 }}
-          />
-          <Space wrap>
-            {NODES.map((n) => {
-              const done = confirmations[n.key]?.disposition === "confirmed";
-              return (
-                <Button
-                  key={n.key}
-                  type={done ? "primary" : "default"}
-                  icon={done ? <CheckCircleOutlined /> : undefined}
-                  onClick={() => doConfirm(n.key)}
-                >
-                  {n.title}
-                </Button>
-              );
-            })}
-          </Space>
-        </Space>
-      </Card>
-
       <Card
         title={`证据材料（${evidence.length}）`}
         extra={
@@ -145,6 +84,9 @@ export default function EvidencePanel({ state, eventId, onRefresh }: any) {
         }
         style={{ marginBottom: 16 }}
       >
+        <Typography.Paragraph type="secondary">
+          原始材料（访谈记录、留样、检验报告、就餐名单等）为「证据底座」；派生指标与结论均据此重算。
+        </Typography.Paragraph>
         <Table
           rowKey="id"
           size="small"
@@ -161,7 +103,7 @@ export default function EvidencePanel({ state, eventId, onRefresh }: any) {
 
       <Card title="调查结论">
         <List
-          dataSource={TOPICS}
+          dataSource={CONCLUSION_TOPICS}
           renderItem={(t) => {
             const cur = conclusions.find((c: any) => c.topic === t.key);
             return (
@@ -173,8 +115,8 @@ export default function EvidencePanel({ state, eventId, onRefresh }: any) {
                     <Space>
                       <span>{t.name}</span>
                       {cur && (
-                        <Tag color="blue">
-                          {STATUS_OPTS.find((s) => s.value === cur.status)?.label ?? cur.status}
+                        <Tag color={STATUS_COLOR[cur.status] ?? "default"}>
+                          {CONCLUSION_STATUS[cur.status] ?? cur.status}
                         </Tag>
                       )}
                     </Space>
@@ -210,7 +152,7 @@ export default function EvidencePanel({ state, eventId, onRefresh }: any) {
       <Modal title="编辑结论" open={!!conclTopic} onOk={onSaveConclusion} onCancel={() => setConclTopic(null)} okText="保存">
         <Form form={conclForm} layout="vertical">
           <Form.Item name="status" label="结论状态">
-            <Select options={STATUS_OPTS} />
+            <Select options={Object.entries(CONCLUSION_STATUS).map(([v, l]) => ({ value: v, label: l }))} />
           </Form.Item>
           <Form.Item name="statement" label="结论陈述">
             <Input.TextArea rows={2} />
@@ -218,6 +160,24 @@ export default function EvidencePanel({ state, eventId, onRefresh }: any) {
           <Form.Item name="reason" label="依据与理由">
             <Input.TextArea rows={2} />
           </Form.Item>
+          {conclTopic === "contamination" && (
+            <Space size={16} style={{ display: "flex" }} wrap>
+              <Form.Item name="link" label="污染环节" style={{ marginBottom: 0 }}>
+                <Select
+                  allowClear
+                  style={{ width: 220 }}
+                  options={CONTAMINATION_LINKS.map((l) => ({ value: l, label: l }))}
+                />
+              </Form.Item>
+              <Form.Item name="factor" label="污染原因" style={{ marginBottom: 0 }}>
+                <Select
+                  allowClear
+                  style={{ width: 260 }}
+                  options={CONTAMINATION_FACTORS.map((f) => ({ value: f, label: f }))}
+                />
+              </Form.Item>
+            </Space>
+          )}
           <Form.Item name="limitations" label="局限">
             <Input.TextArea rows={2} />
           </Form.Item>

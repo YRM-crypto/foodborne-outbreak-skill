@@ -42,14 +42,23 @@ export async function upsertExposures(id: string, payload: any[]) {
 export async function upsertSamples(id: string, payload: any[]) {
   return (await api.put(`/events/${id}/samples`, payload)).data;
 }
+export async function upsertFoods(id: string, payload: any[]) {
+  return (await api.put(`/events/${id}/foods`, payload)).data;
+}
+export async function upsertHygiene(id: string, payload: any[]) {
+  return (await api.put(`/events/${id}/hygiene`, payload)).data;
+}
+export async function upsertControls(id: string, payload: any[]) {
+  return (await api.put(`/events/${id}/controls`, payload)).data;
+}
 export async function addEvidence(id: string, payload: any) {
   return (await api.post(`/events/${id}/evidence`, payload)).data;
 }
 export async function setConclusion(id: string, payload: any) {
   return (await api.post(`/events/${id}/conclusions`, payload)).data;
 }
-export async function confirm(id: string, payload: any) {
-  return (await api.post(`/events/${id}/confirm`, payload)).data;
+export async function setStage(id: string, payload: any) {
+  return (await api.post(`/events/${id}/stages`, payload)).data;
 }
 
 // —— 知识库 ——

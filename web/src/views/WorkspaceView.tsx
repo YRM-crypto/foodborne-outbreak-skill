@@ -1,44 +1,16 @@
-import { ArrowLeftOutlined, CheckCircleFilled, RobotOutlined } from "@ant-design/icons";
-import {
-  Alert,
-  Button,
-  Descriptions,
-  Space,
-  Spin,
-  Steps,
-  Tabs,
-  Tag,
-  Typography,
-  message,
-} from "antd";
+import { ArrowLeftOutlined, RobotOutlined } from "@ant-design/icons";
+import { Alert, Button, Card, Descriptions, Progress, Space, Spin, Tabs, Tag, Typography, message } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { analyzeEvent, loadEvent, timeline } from "../api/client";
+import { STAGES, STUDY_DESIGNS } from "../constants";
 import AnalysisPanel from "./workspace/AnalysisPanel";
-import DataPanel from "./workspace/DataPanel";
+import CasesPanel from "./workspace/CasesPanel";
+import DefinitionPanel from "./workspace/DefinitionPanel";
 import EvidencePanel from "./workspace/EvidencePanel";
+import FieldPanel from "./workspace/FieldPanel";
+import StagesPanel from "./workspace/StagesPanel";
 import TracePanel from "./workspace/TracePanel";
-
-const FLOW_NODES = [
-  { key: "intake", title: "接报" },
-  { key: "definition", title: "病例定义" },
-  { key: "plan", title: "调查计划" },
-  { key: "analysis", title: "分析" },
-  { key: "evidence", title: "证据" },
-  { key: "conclusion", title: "结论" },
-  { key: "closure", title: "结案" },
-];
-
-// 阶段化流程强引导：每个节点的下一步提示 + 对应处理位置（工作区标签页）
-const NODE_GUIDANCE: Record<string, { hint: string; tab: string }> = {
-  intake: { hint: "登记事件基本信息（负责人、接报时间、地点、涉及人数）", tab: "data" },
-  definition: { hint: "确定病例定义：时间 / 地点 / 人群范围 + 纳入症状", tab: "data" },
-  plan: { hint: "明确调查计划与任务分工，确认「调查计划」节点", tab: "evidence" },
-  analysis: { hint: "查看流行曲线、三间分布与食品关联分析", tab: "analysis" },
-  evidence: { hint: "录入证据材料（留样、检验报告、就餐名单）", tab: "evidence" },
-  conclusion: { hint: "综合研判事件性质、原因食品等结论", tab: "evidence" },
-  closure: { hint: "确认结案节点，随后到「报告」页生成结案报告", tab: "evidence" },
-};
 
 export default function WorkspaceView() {
   const { eventId = "" } = useParams();
@@ -79,19 +51,14 @@ export default function WorkspaceView() {
       <Alert
         type="error"
         message="未找到事件"
-        action={
-          <Button onClick={() => navigate("/cases")}>返回案例总览</Button>
-        }
+        action={<Button onClick={() => navigate("/cases")}>返回案例总览</Button>}
       />
     );
   }
 
   const event = state.event;
-  const confirmations = state.confirmations ?? {};
-  const confirmedCount = FLOW_NODES.filter(
-    (n) => confirmations[n.key]?.disposition === "confirmed"
-  ).length;
-  const nextNode = FLOW_NODES.find((n) => confirmations[n.key]?.disposition !== "confirmed");
+  const stages = state.stages ?? {};
+  const doneCount = STAGES.filter((s) => stages[s.id]?.status === "done").length;
 
   return (
     <div>
@@ -106,78 +73,54 @@ export default function WorkspaceView() {
           {event.title}
         </Typography.Title>
         <Tag color="blue">{event.id}</Tag>
-        <Tag>{event.scenario === "closed-cohort" ? "封闭队列" : "散发性零售"}</Tag>
         <Tag color="green">修订 {event.revision}</Tag>
       </Space>
 
       <Descriptions size="small" column={4} style={{ marginBottom: 16 }}>
         <Descriptions.Item label="负责人">{event.lead || "—"}</Descriptions.Item>
+        <Descriptions.Item label="场所类型">{event.place_type || "—"}</Descriptions.Item>
+        <Descriptions.Item label="地区">{event.region || "—"}</Descriptions.Item>
         <Descriptions.Item label="接报时间">{event.received_at || "—"}</Descriptions.Item>
-        <Descriptions.Item label="地点">{event.location || "—"}</Descriptions.Item>
-        <Descriptions.Item label="资料截止">{event.data_cutoff || "—"}</Descriptions.Item>
+        <Descriptions.Item label="发生时间">{event.occurred_at || "—"}</Descriptions.Item>
+        <Descriptions.Item label="暴露时间">{event.exposure_at || "—"}</Descriptions.Item>
+        <Descriptions.Item label="研究设计">
+          {event.study_design ? STUDY_DESIGNS[event.study_design] ?? event.study_design : "—"}
+        </Descriptions.Item>
+        <Descriptions.Item label="暴露人数">
+          {event.population_size != null ? event.population_size : "—"}
+        </Descriptions.Item>
       </Descriptions>
 
-      <Steps
-        size="small"
-        current={confirmedCount}
-        items={FLOW_NODES.map((n) => ({ title: n.title }))}
-        style={{ marginBottom: 12 }}
-      />
-
-      {nextNode ? (
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 16 }}
-          message={
-            <Space wrap>
-              <span>
-                建议下一步：完善「{nextNode.title}」——{NODE_GUIDANCE[nextNode.key]?.hint}。
-              </span>
-              <Button
-                size="small"
-                type="primary"
-                onClick={() => setTab(NODE_GUIDANCE[nextNode.key]?.tab ?? "analysis")}
-              >
-                前往处理
-              </Button>
-            </Space>
-          }
-        />
-      ) : (
-        <Alert
-          type="success"
-          showIcon
-          icon={<CheckCircleFilled />}
-          style={{ marginBottom: 16 }}
-          message="全部流程节点已确认，可前往「报告」页生成结案报告。"
-        />
-      )}
+      <Card size="small" style={{ marginBottom: 16 }}>
+        <Space direction="vertical" style={{ width: "100%" }}>
+          <Space wrap>
+            <span>调查阶段完成度：</span>
+            <Progress
+              style={{ width: 260 }}
+              percent={Math.round((doneCount / STAGES.length) * 100)}
+              size="small"
+            />
+            <Typography.Text type="secondary">
+              {doneCount}/{STAGES.length} 阶段已完成
+            </Typography.Text>
+          </Space>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            13 个阶段为「引导清单」而非强制门禁：工作流并非单向，任何环节均可补充新调查材料并随时重算。
+          </Typography.Text>
+        </Space>
+      </Card>
 
       <Tabs
         activeKey={tab}
         onChange={setTab}
         items={[
-          {
-            key: "analysis",
-            label: "分析",
-            children: <AnalysisPanel analysis={analysis} />,
-          },
-          {
-            key: "data",
-            label: "病例定义与数据",
-            children: <DataPanel state={state} eventId={eventId} onRefresh={load} />,
-          },
-          {
-            key: "evidence",
-            label: "证据与结论",
-            children: <EvidencePanel state={state} eventId={eventId} onRefresh={load} />,
-          },
-          {
-            key: "trace",
-            label: "溯源（审计）",
-            children: <TracePanel audit={audit} />,
-          },
+          { key: "analysis", label: "分析", children: <AnalysisPanel analysis={analysis} /> },
+          { key: "definition", label: "病例定义", children: <DefinitionPanel state={state} eventId={eventId} onRefresh={load} /> },
+          { key: "cases", label: "个案与暴露", children: <CasesPanel state={state} eventId={eventId} onRefresh={load} /> },
+          { key: "field", label: "现场调查", children: <FieldPanel state={state} eventId={eventId} onRefresh={load} /> },
+          { key: "evidence", label: "证据与结论", children: <EvidencePanel state={state} eventId={eventId} onRefresh={load} /> },
+          { key: "stages", label: "调查阶段", children: <StagesPanel state={state} eventId={eventId} onRefresh={load} /> },
+          { key: "trace", label: "溯源（审计）", children: <TracePanel audit={audit} /> },
         ]}
       />
     </div>

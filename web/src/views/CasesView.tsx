@@ -15,12 +15,8 @@ import {
 } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createEvent, listEvents, seedDemo } from "../api/client";
-
-const scenarioLabels: Record<string, string> = {
-  "closed-cohort": "封闭队列",
-  "distributed-retail": "散发性零售",
-};
+import { createEvent, listEvents, seedDemo, updateEvent } from "../api/client";
+import { PLACE_TYPES } from "../constants";
 
 export default function CasesView() {
   const navigate = useNavigate();
@@ -49,6 +45,10 @@ export default function CasesView() {
     const values = await form.validateFields();
     try {
       await createEvent(values);
+      const patch: any = {};
+      if (values.place_type) patch.place_type = values.place_type;
+      if (values.region) patch.region = values.region;
+      if (Object.keys(patch).length) await updateEvent(values.event_id, patch);
       message.success("已创建事件");
       setOpen(false);
       form.resetFields();
@@ -77,11 +77,12 @@ export default function CasesView() {
     { title: "事件编号", dataIndex: "id", key: "id" },
     { title: "标题", dataIndex: "title", key: "title" },
     {
-      title: "类型",
-      dataIndex: "scenario",
-      key: "scenario",
-      render: (v: string) => <Tag color="blue">{scenarioLabels[v] ?? v}</Tag>,
+      title: "场所类型",
+      dataIndex: "place_type",
+      key: "place_type",
+      render: (v: string) => (v ? <Tag color="blue">{v}</Tag> : "—"),
     },
+    { title: "地区", dataIndex: "region", key: "region", render: (v: string) => v || "—" },
     { title: "负责人", dataIndex: "lead", key: "lead" },
     { title: "修订", dataIndex: "revision", key: "revision" },
     {
@@ -111,8 +112,8 @@ export default function CasesView() {
             direction="vertical"
             style={{ maxWidth: 440, margin: "16px auto", textAlign: "left" }}
             items={[
-              { title: "新建事件", description: "登记事件编号、标题、类型与负责人" },
-              { title: "录入数据", description: "病例定义、病例与未发病名单、暴露史" },
+              { title: "新建事件", description: "登记事件编号、标题、场所类型与负责人" },
+              { title: "录入数据", description: "病例定义、个案与暴露、食品/样本/卫生学" },
               { title: "分析与报告", description: "查看流行曲线与食品关联，生成调查报告" },
             ]}
           />
@@ -145,7 +146,7 @@ export default function CasesView() {
         onCancel={() => setOpen(false)}
         okText="创建"
       >
-        <Form form={form} layout="vertical" initialValues={{ scenario: "closed-cohort" }}>
+        <Form form={form} layout="vertical">
           <Form.Item
             name="event_id"
             label="事件编号"
@@ -160,13 +161,11 @@ export default function CasesView() {
           >
             <Input placeholder="如 某学校聚集性呕吐" />
           </Form.Item>
-          <Form.Item name="scenario" label="调查类型">
-            <Select
-              options={[
-                { value: "closed-cohort", label: "封闭队列（聚餐/食堂）" },
-                { value: "distributed-retail", label: "散发性零售（食品溯源）" },
-              ]}
-            />
+          <Form.Item name="place_type" label="场所类型">
+            <Select allowClear options={PLACE_TYPES.map((p) => ({ value: p, label: p }))} />
+          </Form.Item>
+          <Form.Item name="region" label="地区">
+            <Input placeholder="如 XX 省 XX 市" />
           </Form.Item>
           <Form.Item name="lead" label="负责人">
             <Input placeholder="调查组" />
