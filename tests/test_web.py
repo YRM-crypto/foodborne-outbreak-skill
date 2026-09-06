@@ -41,5 +41,10 @@ class TestWeb(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("登记 0 人", r.text)
 
+    def test_references_page(self):
+        r = self.client.get("/references")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("查资料", r.text)
+
 if __name__ == "__main__":
     unittest.main()
