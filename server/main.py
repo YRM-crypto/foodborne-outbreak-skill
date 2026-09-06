@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import events, kb
+from .routers import assistant, events, kb
 
 
 def create_app() -> FastAPI:
@@ -15,6 +15,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(events.router, prefix="/api/events", tags=["events"])
     app.include_router(kb.router, prefix="/api/kb", tags=["kb"])
+    app.include_router(assistant.router, prefix="/api/assistant", tags=["assistant"])
     return app
 
 

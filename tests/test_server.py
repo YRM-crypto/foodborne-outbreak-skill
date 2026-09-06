@@ -101,3 +101,20 @@ def test_kb_basis_docs(client):
     docs = r.json()
     assert docs, "依据库应有文档"
     assert all("id" in d and "preview" in d for d in docs)
+
+
+def test_assistant_context(client):
+    _seed_event(client)
+    state = client.get("/api/events/EV-001/load").json()
+    from server.assistant import build_context, context_markdown
+
+    ctx = build_context(state)
+    assert ctx["counts"]["case"] == 18
+    assert ctx["counts"]["noncase"] == 12
+    assert ctx["attack_rate"] == "60.0%"
+    assert any("F1" in a for a in ctx["associations"])
+
+    md = context_markdown(ctx)
+    assert "病例定义" in md
+    assert "符合病例定义 18" in md
+    assert "罹患率 60.0%" in md

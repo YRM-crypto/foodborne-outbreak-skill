@@ -140,3 +140,44 @@ async def ingest(rag, docs):
 
 async def query(rag, question, mode="hybrid"):
     return await rag.aquery(question, param=QueryParam(mode=mode, enable_rerank=False))
+
+
+def _source_label(doc_id):
+    """把灌库时的 doc_id 映射成可读的中文来源名。"""
+    if ":" in doc_id:
+        kind, name = doc_id.split(":", 1)
+        if kind == "standard":
+            return f"规范《{name}》"
+        if kind == "pathogen":
+            return f"致病因子·{name}"
+        if kind == "report":
+            return f"结案报告·{name}"
+        if kind == "monitoring":
+            return f"监测数据·第{name}批"
+    if doc_id == "checklist":
+        return "调查清单"
+    return doc_id
+
+
+async def query_sources(rag, question):
+    """返回循证来源（去重后的 doc_id / 中文名），供前端展示引用依据。
+
+    LightRAG 的 aquery_data 把来源挂在 chunks 的 chunk_id 上（file_path 多为
+    "unknown_source"、references 常为空），因此从 chunk_id 解析 doc_id。
+    """
+    if not hasattr(rag, "aquery_data"):
+        return []
+    param = QueryParam(mode="hybrid", enable_rerank=False)
+    result = await rag.aquery_data(question, param=param)
+    data = (result or {}).get("data") or {}
+    seen, out = set(), []
+    for c in (data.get("chunks") or []):
+        if not isinstance(c, dict):
+            continue
+        cid = c.get("chunk_id", "")
+        doc_id = cid.split("-chunk-")[0] if "-chunk-" in cid else cid
+        if not doc_id or doc_id in seen:
+            continue
+        seen.add(doc_id)
+        out.append({"doc_id": doc_id, "label": _source_label(doc_id)})
+    return out
