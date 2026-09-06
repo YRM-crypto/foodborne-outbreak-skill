@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block content %}
+<h1>{{ state.event.title }}</h1>
+<p>编号 {{ state.event.id }} · rev {{ state.event.revision }} · 负责人 {{ state.event.lead or '待定' }}</p>
+<p>
+<a href="/investigations/{{ state.event.id }}/check">检查缺项</a> |
+<a href="/investigations/{{ state.event.id }}/analyze">生成分析</a> |
+<a href="/investigations/{{ state.event.id }}/similar">相似案例</a> |
+<a href="/investigations/{{ state.event.id }}/report">报告草稿</a>
+</p>
+<h2>调查时间线</h2>
+<ul>{% for t in timeline %}<li><strong>{{ t.actor }}</strong> · {{ t.action }}（{{ t.recorded_at }}）：{{ t.reason }}</li>{% endfor %}</ul>
+{% endblock %}

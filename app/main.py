@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -45,6 +45,16 @@ def create_app(db_path=None, vector_db_path=None, xls_path=None):
         except ValueError as e:
             return templates.TemplateResponse(request, "new.html", {"error": str(e)}, status_code=400)
         return RedirectResponse("/investigations", status_code=303)
+
+    @app.get("/investigations/{event_id}")
+    def detail(request: Request, event_id: str):
+        try:
+            state = app.state.store.load(event_id)
+        except ValueError as e:
+            return PlainTextResponse(str(e), status_code=404)
+        timeline = app.state.store.timeline(event_id)
+        return templates.TemplateResponse(request, "investigation.html",
+                                          {"state": state, "timeline": timeline})
 
     return app
 
