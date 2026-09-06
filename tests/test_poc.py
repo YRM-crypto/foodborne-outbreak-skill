@@ -13,9 +13,11 @@ class TestPoc(unittest.TestCase):
         c = TestClient(app)
         r = c.get("/v1/models")
         self.assertEqual(r.status_code, 200)
-        self.assertIn("deepseek", r.text)
+        self.assertIn(config.LLM_MODEL, r.text)
 
     def test_chat_requires_key(self):
+        if config.LLM_PROVIDER == "ollama":
+            self.skipTest("ollama 无需 key，跳过空 key 保护测试")
         if config.LLM_API_KEY:
             self.skipTest("已配置真实 key，跳过空 key 保护测试")
         c = TestClient(app)

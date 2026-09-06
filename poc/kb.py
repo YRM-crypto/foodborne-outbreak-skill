@@ -1,4 +1,4 @@
-"""LightRAG 知识层：本地 embedding + OpenAI 兼容 LLM，两个库（依据/案例）。"""
+"""LightRAG 知识层：默认走本地 Ollama（LLM=qwen、embedding=bge-m3），两个库（依据/案例）。"""
 import asyncio
 import json
 from pathlib import Path
@@ -12,7 +12,10 @@ from . import config
 
 
 def make_llm_func():
-    """OpenAI 兼容 LLM 函数（DeepSeek），匹配 LightRAG 调用约定。"""
+    if config.LLM_PROVIDER == "ollama":
+        from lightrag.llm.ollama import ollama_model_complete
+        return ollama_model_complete
+
     async def llm_func(prompt, system_prompt=None, history_messages=None, **kwargs):
         if history_messages is None:
             history_messages = []
@@ -37,6 +40,10 @@ def _get_embed_model():
 
 
 def make_embedding_func():
+    if config.EMBEDDING_PROVIDER == "ollama":
+        from lightrag.llm.ollama import ollama_embed
+        return ollama_embed
+
     model = _get_embed_model()
 
     async def embed_func(texts, context="document", **kwargs):
@@ -129,4 +136,4 @@ async def ingest(rag, docs):
 
 
 async def query(rag, question, mode="hybrid"):
-    return await rag.aquery(question, param=QueryParam(mode=mode))
+    return await rag.aquery(question, param=QueryParam(mode=mode, enable_rerank=False))

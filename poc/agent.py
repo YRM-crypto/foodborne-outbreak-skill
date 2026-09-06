@@ -60,8 +60,12 @@ def _build_tools():
 
 
 def build_agent():
-    llm = ChatOpenAI(model=config.LLM_MODEL, base_url=config.LLM_BASE_URL,
-                     api_key=config.LLM_API_KEY or "sk-placeholder", temperature=0)
+    if config.LLM_PROVIDER == "ollama":
+        llm = ChatOpenAI(model=config.LLM_MODEL, base_url=config.OLLAMA_HOST + "/v1",
+                         api_key="ollama", temperature=0)
+    else:
+        llm = ChatOpenAI(model=config.LLM_MODEL, base_url=config.LLM_BASE_URL,
+                         api_key=config.LLM_API_KEY or "sk-placeholder", temperature=0)
     return create_react_agent(llm, _build_tools(), prompt=SYSTEM_PROMPT,
                               checkpointer=MemorySaver())
 
@@ -105,9 +109,9 @@ def create_app():
 
     @app.post("/v1/chat/completions")
     async def chat(req: ChatRequest):
-        if not config.LLM_API_KEY:
+        if config.LLM_PROVIDER != "ollama" and not config.LLM_API_KEY:
             from fastapi.responses import JSONResponse
-            return JSONResponse({"error": {"message": "未配置 LLM_API_KEY，请在 poc/.env 填写 DeepSeek key"}},
+            return JSONResponse({"error": {"message": "未配置 LLM_API_KEY，请在 poc/.env 填写 LLM key"}},
                                 status_code=400)
         messages = _to_lc(req.messages)
 
