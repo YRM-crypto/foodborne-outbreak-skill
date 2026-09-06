@@ -1,0 +1,24 @@
+[project]
+name = "foodborne-outbreak-assistant"
+version = "0.1.0"
+description = "食源性疾病暴发调查助手：以事件为中心，查依据、补资料、做分析、核证据、写报告"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "jieba>=0.42.1",
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.32",
+    "uvicorn[standard]>=0.52.4",
+    "xlrd>=2.0.2",
+]
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.0.0"]
+local-embed = ["sentence-transformers>=3.0.0"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
