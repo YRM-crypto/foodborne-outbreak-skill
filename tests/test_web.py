@@ -46,5 +46,12 @@ class TestWeb(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("查资料", r.text)
 
+    def test_report_page(self):
+        self.client.post("/investigations/new", data={
+            "id": "EV-001", "title": "学校聚集性胃肠炎", "scenario": "closed-cohort", "lead": "张三"})
+        r = self.client.get("/investigations/EV-001/report")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("阶段调查报告", r.text)
+
 if __name__ == "__main__":
     unittest.main()

@@ -7,6 +7,8 @@ from pathlib import Path
 from app.config import Config
 from core.store import Store
 from core.analyze import analyze
+from core.report import render_markdown
+from core.deidentify import scrub
 from assistant.orchestrator import render_gaps, Orchestrator
 from assistant.client import ChatClient
 from kb.embed import Embedder
@@ -63,6 +65,19 @@ def compute_gaps(state):
         gaps.append({"id": "evidence", "stage": "证据整理", "title": "尚未录入任何材料",
                      "why": "结论需有材料依据", "table": "附表3-7", "basis": "S2012 §6"})
     return gaps
+
+
+def report_issues(state):
+    issues = []
+    if not state["definition"]:
+        issues.append("尚无病例定义，报告结论缺少口径依据")
+    for topic in ("event_nature", "scope", "agent", "food", "contamination"):
+        row = next((x for x in state["conclusions"] if x["topic"] == topic), None)
+        if row and not row.get("evidence_ids"):
+            issues.append(f"{topic} 结论缺少证据引用")
+    if not state["people"]:
+        issues.append("尚无人员资料，不能生成分析结果")
+    return issues
 
 
 def create_app(db_path=None, vector_db_path=None, xls_path=None):
@@ -147,6 +162,17 @@ def create_app(db_path=None, vector_db_path=None, xls_path=None):
         return templates.TemplateResponse(request, "similar.html",
                                           {"event": state["event"], "hits": hits,
                                            "summary": orchestrator.similar(q, hits)})
+
+    @app.get("/investigations/{event_id}/report")
+    def report_route(request: Request, event_id: str):
+        state = app.state.store.load(event_id)
+        stats = analyze(state)
+        md = render_markdown(state, stats, "progress")
+        if cfg.deidentify:
+            md = scrub(md)
+        issues = report_issues(state)
+        return templates.TemplateResponse(request, "report.html",
+                                          {"event": state["event"], "md": md, "issues": issues})
 
     return app
 
